@@ -18,4 +18,13 @@ export class ProductService {
       tap(()=> console.log('In Http.get pipeline'))
     );
   }
+
+  getProduct(id:number): Observable<Product>{
+    const productUrl = this.productsUrl + '/' + id
+
+    return this.http.get<Product>(productUrl)
+    .pipe(
+      tap(()=> console.log('In Fetching the product with its Id'))
+    );
+  }
 }
