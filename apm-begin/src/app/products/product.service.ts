@@ -1,6 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, concatMap, map, of, switchMap, tap, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, catchError, concatMap, filter, map, of, shareReplay, switchMap, tap, throwError } from 'rxjs';
 import { Product } from './product';
 import { HttpErrorService } from '../utilities/http-error.service';
 import { ReviewService } from '../reviews/review.service';
@@ -19,13 +19,34 @@ export class ProductService {
   private httpErrorService = inject(HttpErrorService);
 
   private reviewService = inject(ReviewService);
-  
-  getProducts(): Observable<Product[]> {
-    return this.http.get<Product[]>(this.productsUrl).pipe(
-      tap(()=> console.log('In Http.get pipeline')),
-      catchError(err => this.handleError(err))
-    );
+
+  private productSelectedSubject = new BehaviorSubject<number | undefined>(undefined);
+  readonly productSelected$ = this.productSelectedSubject.asObservable();
+
+  readonly products$ = this.http.get<Product[]>(this.productsUrl).
+  pipe(
+    tap((p)=>  console.log(JSON.stringify(p))),
+    shareReplay(1),
+    tap(() => console.log(`After Replay`)),
+    catchError(err => this.handleError(err))
+  );
+
+  productSelected(selectedProductId: number): void {
+    this.productSelectedSubject.next(selectedProductId);
   }
+
+  readonly product$ = this.productSelected$
+  .pipe(
+    filter(Boolean),
+    switchMap( id => {
+      const productUrl = this.productsUrl + '/' + id
+      return this.http.get<Product>(productUrl)
+      .pipe(
+        switchMap( product => this.getProductWithReviews(product)),
+        catchError(err => this.handleError(err))
+      );
+    })
+  )
 
   getProduct(id:number): Observable<Product>{
     const productUrl = this.productsUrl + '/' + id
